@@ -4,76 +4,79 @@
 #include <libsnark/gadgetlib1/pb_variable.hpp>
 #include <libsnark/gadgetlib1/protoboard.hpp>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
+#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
 
 using namespace std;
 using namespace libsnark;
 
-
+typedef default_r1cs_ppzksnark_pp ppT;
 typedef libff::Fr<ppT> FieldT;
 
-class MultiplicationGadget : public gadget<FieldT>
+class ZkPrivateKeyCircuit : public gadget<FieldT>
 {
 private:
-    pb_variable<FieldT> x;  // private input
-    pb_variable<FieldT> y;  // private input
-    pb_variable<FieldT> z;  // public output
+    // private inputs
+    pb_variable<FieldT> sk;  // private key
+    pb_variable<FieldT> g;  // generator
+    // public input
+    pb_variable<FieldT> pk;  // public key
 
 public:
-    MultiplicationGadget(
+    ZkPrivateKeyCircuit(
         protoboard<FieldT>& pb,
         const std::string& annotation_prefix)
         : gadget<FieldT>(pb, annotation_prefix)
     {
-        // First allocate z (public output)
-        z.allocate(pb, FMT("", "%s/z", annotation_prefix.c_str()));
+        // First allocate pk (public output)
+        pk.allocate(pb, FMT("", "%s/pk", annotation_prefix.c_str()));
 
         // Then allocate private inputs
-        x.allocate(pb, FMT("", "%s/x", annotation_prefix.c_str()));
-        y.allocate(pb, FMT("", "%s/y", annotation_prefix.c_str()));
+        sk.allocate(pb, FMT("", "%s/sk", annotation_prefix.c_str()));
+        g.allocate(pb, FMT("", "%s/g", annotation_prefix.c_str()));
 
-        // Mark only z as public input
+        // Mark only pk as public input
         pb.set_input_sizes(1);
     }
 
     void
     generate_r1cs_constraints()
     {
-        // Constraint x * y = z
+        // Constraint sk * g = pk
         this->pb.add_r1cs_constraint(
-            r1cs_constraint<FieldT>(x, y, z),
+            r1cs_constraint<FieldT>(sk, g, pk),
             FMT("", "%s/multiplication", this->annotation_prefix.c_str()));
     }
 
     void
-    generate_r1cs_witness(const FieldT& x_val, const FieldT& y_val)
+    generate_r1cs_witness(const FieldT& sk_val, const FieldT& g_val)
     {
-        this->pb.val(x) = x_val;
-        this->pb.val(y) = y_val;
-        this->pb.val(z) = x_val * y_val;
+        this->pb.val(sk) = sk_val;
+        this->pb.val(g) = g_val;
+        this->pb.val(pk) = sk_val * g_val;
     }
 
     // Accessor methods
     const pb_variable<FieldT>&
-    get_x() const
+    get_private_key() const
     {
-        return x;
+        return sk;
     }
     const pb_variable<FieldT>&
-    get_y() const
+    get_generator() const
     {
-        return y;
+        return g;
     }
     const pb_variable<FieldT>&
-    get_z() const
+    get_public_key() const
     {
-        return z;
+        return pk;
     }
 };
 
 void
-test_basic_snark()
+test_snark()
 {
-    std::cout << "Testing basic SNARK operation..." << std::endl;
+    std::cout << "Testing SNARK operation..." << std::endl;
 
     // Initialize the curve parameters
     ppT::init_public_params();
@@ -82,10 +85,10 @@ test_basic_snark()
     protoboard<FieldT> pb;
 
     // Create and set up the gadget
-    MultiplicationGadget multiplication_gadget(pb, "multiplication");
+    ZkPrivateKeyCircuit multiplication_gadget(pb, "multiplication");
     multiplication_gadget.generate_r1cs_constraints();
 
-    // Generate witness with x * y = z (3 * 4 = 12)
+    // Generate witness with sk * g = pk (3 * 4 = 12)
     multiplication_gadget.generate_r1cs_witness(FieldT(3), FieldT(4));
 
     // Debug output
@@ -95,7 +98,7 @@ test_basic_snark()
               << std::endl;
     std::cout << "Auxiliary (private) input size: "
               << pb.auxiliary_input().size() << std::endl;
-    std::cout << "Expected result (z): " << pb.primary_input()[0] << std::endl;
+    std::cout << "Expected result (pk): " << pb.primary_input()[0] << std::endl;
 
     const r1cs_constraint_system<FieldT> constraint_system =
         pb.get_constraint_system();
@@ -127,10 +130,10 @@ test_invalid_proof()
     ppT::init_public_params();
     protoboard<FieldT> pb;
 
-    MultiplicationGadget multiplication_gadget(pb, "multiplication");
+    ZkPrivateKeyCircuit multiplication_gadget(pb, "multiplication");
     multiplication_gadget.generate_r1cs_constraints();
 
-    // Generate witness with x * y = z (3 * 4 = 12)
+    // Generate witness with sk * g = pk (3 * 4 = 12)
     multiplication_gadget.generate_r1cs_witness(FieldT(3), FieldT(4));
 
     const r1cs_constraint_system<FieldT> constraint_system =
@@ -158,23 +161,7 @@ test_invalid_proof()
 int
 main()
 {
-    test_basic_snark();
+    test_snark();
     test_invalid_proof();
     return 0;
 }
-
-/*
-Compile and run with:
-
-g++ -std=c++14 \
--I/home/wlin/rippled/external/libsnark \
--I/home/wlin/rippled/external/libsnark/depends/libff \
--I/home/wlin/rippled/external/libsnark/depends/libfqfft \
--L/home/wlin/rippled/external/libsnark/build/libsnark \
--L/home/wlin/rippled/external/libsnark/depends/libff/build/libff \
--DCURVE_ALT_BN128 \
-snark_test.cpp -o snark_test_program \
--lsnark -lff -lgmp -lgmpxx -lprocps
-
-./snark_test_program
-*/

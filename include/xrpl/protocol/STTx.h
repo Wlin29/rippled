@@ -47,6 +47,52 @@ class STTx final : public STObject, public CountedObject<STTx>
 {
     uint256 tid_;
     TxType tx_type_;
+    // New fields for ZK proofs
+    Blob zkProof_;           // The actual ZK proof data
+    uint256 zkPublicInputs_; // Public inputs for the ZK proof
+
+public:
+    // ... existing code ...
+
+    // Add new methods to handle ZK proofs
+    void
+    setZKProof(Blob const& proof)
+    {
+        zkProof_ = proof;
+    }
+
+    Blob
+    getZKProof() const
+    {
+        return zkProof_;
+    }
+
+    void
+    setZKPublicInputs(uint256 const& inputs)
+    {
+        zkPublicInputs_ = inputs;
+    }
+
+    uint256
+    getZKPublicInputs() const
+    {
+        return zkPublicInputs_;
+    }
+
+    // Consider adding a method to verify ZK proofs
+    bool
+    verifyZKProof() const;
+
+    // ... rest of existing code ...
+};
+
+class STTx final : public STObject, public CountedObject<STTx>
+{
+    uint256 tid_;
+    TxType tx_type_;
+    // New fields for ZK proofs
+    Blob zkProof_;           // The actual ZK proof data
+    uint256 zkPublicInputs_; // Public inputs for the ZK proof
 
 public:
     static std::size_t const minMultiSigners = 1;
@@ -138,6 +184,36 @@ public:
         std::uint32_t inLedger,
         char status,
         std::string const& escapedMetaData) const;
+
+    // Methods to handle ZK proofs
+    void
+    setZKProof(Blob const& proof)
+    {
+        zkProof_ = proof;
+    }
+
+    Blob
+    getZKProof() const
+    {
+        return zkProof_;
+    }
+
+    void
+    setZKPublicInputs(uint256 const& inputs)
+    {
+        zkPublicInputs_ = inputs;
+    }
+
+    uint256
+    getZKPublicInputs() const
+    {
+        return zkPublicInputs_;
+    }
+
+    // Consider adding a method to verify ZK proofs
+    bool
+    verifyZKProof() const;
+
 
 private:
     Expected<void, std::string>

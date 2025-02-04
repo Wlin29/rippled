@@ -60,7 +60,21 @@ getTxFormat(TxType type)
 STTx::STTx(STObject&& object) : STObject(std::move(object))
 {
     tx_type_ = safe_cast<TxType>(getFieldU16(sfTransactionType));
-    applyTemplate(getTxFormat(tx_type_)->getSOTemplate());  //  may throw
+
+    // Handle ZKP fields for ttZK_PAYMENT
+    if (tx_type_ == ttZK_PAYMENT)
+    {
+        if (!isFieldPresent(sfZKProof) || !isFieldPresent(sfPublicInputs))
+            Throw<std::runtime_error>("Missing ZKP fields for ttZK_PAYMENT");
+
+        // Validate ZKP proof length
+        auto const& proof = getFieldVL(sfZKProof);
+        if (proof.size() !=
+            ZkVerifier::PROOF_SIZE)  // Assume PROOF_SIZE is defined
+            Throw<std::runtime_error>("Invalid ZKP proof length");
+    }
+
+    applyTemplate(getTxFormat(tx_type_)->getSOTemplate());  // May throw
     tid_ = getHash(HashPrefix::transactionID);
 }
 
@@ -75,6 +89,19 @@ STTx::STTx(SerialIter& sit) : STObject(sfTransaction)
         Throw<std::runtime_error>("Transaction contains an object terminator");
 
     tx_type_ = safe_cast<TxType>(getFieldU16(sfTransactionType));
+
+    // Handle ZKP fields for ttZK_PAYMENT
+    if (tx_type_ == ttZK_PAYMENT)
+    {
+        if (!isFieldPresent(sfZKProof) || !isFieldPresent(sfPublicInputs))
+            Throw<std::runtime_error>("Missing ZKP fields for ttZK_PAYMENT");
+
+        // Validate ZKP proof length (example check)
+        auto const& proof = getFieldVL(sfZKProof);
+        if (proof.size() !=
+            ZkVerifier::PROOF_SIZE)  // Assume PROOF_SIZE is defined
+            Throw<std::runtime_error>("Invalid ZKP proof length");
+    }
 
     applyTemplate(getTxFormat(tx_type_)->getSOTemplate());  // May throw
     tid_ = getHash(HashPrefix::transactionID);
@@ -200,6 +227,12 @@ STTx::getSeqProxy() const
 void
 STTx::sign(PublicKey const& publicKey, SecretKey const& secretKey)
 {
+    if (tx_type_ == ttZK_PAYMENT)
+    {
+        // ZKP transactions do not require traditional signatures
+        return;
+    }
+
     auto const data = getSigningData(*this);
 
     auto const sig = ripple::sign(publicKey, secretKey, makeSlice(data));
@@ -233,6 +266,11 @@ Json::Value
 STTx::getJson(JsonOptions options) const
 {
     Json::Value ret = STObject::getJson(JsonOptions::none);
+    if (tx_type_ == ttZK_PAYMENT)
+    {
+        ret["ZKProof"] = strHex(getFieldVL(sfZKProof));
+        ret["PublicInputs"] = strHex(getFieldVL(sfPublicInputs));
+    }
     if (!(options & JsonOptions::disable_API_prior_V2))
         ret[jss::hash] = to_string(getTransactionID());
     return ret;
@@ -257,6 +295,12 @@ STTx::getJson(JsonOptions options, bool binary) const
         }
         else
             return Json::Value{dataBin};
+    }
+
+    if (tx_type_ == ttZK_PAYMENT)
+    {
+        ret["ZKProof"] = strHex(getFieldVL(sfZKProof));
+        ret["PublicInputs"] = strHex(getFieldVL(sfPublicInputs));
     }
 
     Json::Value ret = STObject::getJson(JsonOptions::none);
@@ -311,6 +355,12 @@ STTx::getMetaSQL(
 Expected<void, std::string>
 STTx::checkSingleSign(RequireFullyCanonicalSig requireCanonicalSig) const
 {
+    if (tx_type_ == ttZK_PAYMENT)
+    {
+        // ZKP transactions do not require traditional signatures
+        return {};
+    }
+
     // We don't allow both a non-empty sfSigningPubKey and an sfSigners.
     // That would allow the transaction to be signed two ways.  So if both
     // fields are present the signature is invalid.
@@ -353,6 +403,12 @@ STTx::checkMultiSign(
     RequireFullyCanonicalSig requireCanonicalSig,
     Rules const& rules) const
 {
+    if (tx_type_ == ttZK_PAYMENT)
+    {
+        // ZKP transactions do not require traditional signatures
+        return {};
+    }
+
     // Make sure the MultiSigners are present.  Otherwise they are not
     // attempting multi-signing and we just have a bad SigningPubKey.
     if (!isFieldPresent(sfSigners))
@@ -597,6 +653,15 @@ passesLocalChecks(STObject const& st, std::string& reason)
         return false;
     }
 
+    if (st.getFieldU16(sfTransactionType) == ttZK_PAYMENT)
+    {
+        if (!st.isFieldPresent(sfZKProof) || !st.isFieldPresent(sfPublicInputs))
+        {
+            reason = "Missing ZKP fields for ttZK_PAYMENT";
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -617,6 +682,19 @@ isPseudoTx(STObject const& tx)
         return false;
     auto tt = safe_cast<TxType>(*t);
     return tt == ttAMENDMENT || tt == ttFEE || tt == ttUNL_MODIFY;
+}
+
+bool
+STTx::verifyZKP() const
+{
+    if (tx_type_ != ttZK_PAYMENT)
+        return true;  // Not a ZKP transaction
+
+    auto const& proof = getFieldVL(sfZKProof);
+    auto const& publicInputs = getFieldVL(sfPublicInputs);
+
+    // Use libsnark to verify the proof
+    return ZkVerifier::verify_ZKP(proof, publicInputs);  // TODO
 }
 
 }  // namespace ripple

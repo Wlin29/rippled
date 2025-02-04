@@ -28,6 +28,12 @@
  * and include its header in `src/xrpld/app/tx/detail/applySteps.cpp`.
  */
 
+/** This transaction type is used for zero knowledge transactions */
+TRANSACTION(ttZK_PAYMENT, 70, ZKPayment, ({
+    {sfZKProof, soeREQUIRED},
+    {sfPublicInput, soeREQUIRED},
+}))
+
 /** This transaction type executes a payment. */
 TRANSACTION(ttPAYMENT, 0, Payment, ({
     {sfDestination, soeREQUIRED},

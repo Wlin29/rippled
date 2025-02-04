@@ -28,6 +28,19 @@
 #include <memory>
 #include <utility>
 
+#include <xrpl/protocol/TxFlags.h>
+#include <xrpl/basics/Log.h>
+#include <xrpl/basics/contract.h>
+#include <xrpl/json/to_string.h>
+#include <xrpl/protocol/STAccount.h>
+#include <xrpl/protocol/TxMeta.h>
+#include <libsnark/common/default_types/r1cs_ppzksnark_pp.hpp>
+#include <libsnark/zk_proof_systems/ppzksnark/r1cs_ppzksnark/r1cs_ppzksnark.hpp>
+#include <libff/common/default_types/ec_pp.hpp>
+#include <libff/common/utils.hpp>
+#include <xrpld/app/tx/zkp_circuit.h>
+
+
 namespace ripple {
 
 class Application;

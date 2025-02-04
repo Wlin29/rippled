@@ -193,4 +193,10 @@ include(RippledValidatorKeys)
 
 # include_directories(${CMAKE_SOURCE_DIR}/external/libsnark/include)
 
-add_executable(test_libsnark ./src/snark_test.cpp)target_link_libraries(test_libsnark snark snark_adsnark gmp gmpxx)
+add_executable(test_libsnark ./include/xrpl/protocol/zk/ZkPrivateKeyCircuit.cpp)
+target_link_libraries(test_libsnark snark snark_adsnark gmp gmpxx)
+
+# cd .build
+# make
+# make test_libsnark
+# ./test_libsnark	

@@ -66,6 +66,9 @@ enum TxType : std::uint16_t
 #undef TRANSACTION
 #pragma pop_macro("TRANSACTION")
 
+    /** Custom transaction type for zk payments */
+     = 70,
+
     /** This transaction type is deprecated; it is retained for historical purposes. */
     ttNICKNAME_SET [[deprecated("This transaction type is not supported and should not be used.")]] = 6,
 
